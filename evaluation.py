@@ -1,6 +1,5 @@
 import json
 import re
-import time
 from dataclasses import dataclass
 from typing import Literal
 
@@ -21,6 +20,7 @@ class MATHQuestion:
 
     def get_prompt(self) -> str:
         return f"{self.problem}\n\nPlease enclose your final answer in <answer></answer> tags."
+        # return f"{self.problem} Think step by step.\n\nPlease enclose your final answer in <answer></answer> tags."
 
     @staticmethod
     def parse_response_for_answer(response: str) -> str:
@@ -35,6 +35,7 @@ def load_questions(
     num_examples: int | None = None,
     subject: str | None = None,
     level: int | None = None,
+    reformat: bool = False,
 ) -> list[MATHQuestion]:
     """Load questions from a JSONL file."""
     np.random.seed(42)
@@ -45,6 +46,8 @@ def load_questions(
         all_questions = [q for q in all_questions if q.subject == subject]
     if level is not None:
         all_questions = [q for q in all_questions if q.level == level]
+    if reformat:
+        all_questions = [reformat_solution(q) for q in all_questions]
 
     if num_examples is not None and num_examples < len(all_questions):
         idxs = np.random.choice(len(all_questions), size=num_examples, replace=False)
@@ -79,6 +82,12 @@ async def evaluate_model(
     return accuracy, responses_text
 
 
+def reformat_solution(question: MATHQuestion) -> MATHQuestion:
+    """Reformat the solution to include the answer in <answer> tags."""
+    question.solution += f" The answer is <answer>{question.answer}</answer>."
+    return question
+
+
 if __name__ == "__main__":
     dataset = load_questions("train", subject="Precalculus")
     print(f"Precalculus: {len(dataset)}")
@@ -89,3 +98,9 @@ if __name__ == "__main__":
 
     test_dataset = load_questions("test")
     print(f"Test: {len(test_dataset)}")
+
+    for i in range(10):
+        solution = test_dataset[i].solution
+        print(solution)
+        print(reformat_solution(test_dataset[i]).solution)
+        print()

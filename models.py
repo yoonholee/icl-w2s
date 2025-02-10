@@ -21,7 +21,7 @@ model_nicknames = {
     "haiku-3": "claude-3-haiku-20240307",
 }
 
-MAX_PARALLEL_REQUESTS = 20
+MAX_PARALLEL_REQUESTS = 18
 semaphore = asyncio.Semaphore(MAX_PARALLEL_REQUESTS)
 
 # Initialize cache with 1GB size limit in the .cache directory
