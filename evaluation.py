@@ -20,7 +20,6 @@ class MATHQuestion:
 
     def get_prompt(self) -> str:
         return f"{self.problem}\n\nPlease enclose your final answer in <answer></answer> tags."
-        # return f"{self.problem} Think step by step.\n\nPlease enclose your final answer in <answer></answer> tags."
 
     @staticmethod
     def parse_response_for_answer(response: str) -> str:

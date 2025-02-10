@@ -1,15 +1,15 @@
 import asyncio
+import hashlib
+import json
 import os
 import random
 from time import time
 
 from anthropic import AsyncAnthropic, RateLimitError
 from anthropic.types import Message
+from diskcache import Cache
 from dotenv import load_dotenv
 from tqdm.asyncio import tqdm
-from diskcache import Cache
-import hashlib
-import json
 
 load_dotenv()
 anthropic = AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY_TAKEHOME"])
@@ -21,7 +21,7 @@ model_nicknames = {
     "haiku-3": "claude-3-haiku-20240307",
 }
 
-MAX_PARALLEL_REQUESTS = 18
+MAX_PARALLEL_REQUESTS = 15
 semaphore = asyncio.Semaphore(MAX_PARALLEL_REQUESTS)
 
 # Initialize cache with 1GB size limit in the .cache directory

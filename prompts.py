@@ -7,21 +7,14 @@ def get_few_shot_prompt(
 ) -> list[dict[str, Any]]:
     """Format few-shot examples for the Anthropic API."""
     messages = []
-    if w2s_prompt:
-        messages.append(
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "You will be given a few examples of math problem solutions. Ignore the content of the following examples and only take away the format when writing your own solution.",
-                    }
-                ],
-            }
-        )
     for p, r in prompts_and_responses:
         assert HUMAN_PROMPT not in p, "No need to place the human separator in the prompts!"
         assert AI_PROMPT not in r, "No need to place the assistant separator in the responses!"
+        if w2s_prompt and len(messages) == 0:
+            p = (
+                "The following are examples of math problem solutions from a weaker model. Use the format of the examples to write your own solution.\n\n"
+                + p
+            )
         messages.append({"role": "user", "content": [{"type": "text", "text": p}]})
         messages.append({"role": "assistant", "content": [{"type": "text", "text": r}]})
 

@@ -4,7 +4,6 @@ import copy
 
 import nest_asyncio
 import numpy as np
-from prettytable import PrettyTable
 
 from evaluation import MATHQuestion, evaluate_model, load_questions
 from prompts import get_few_shot_prompt
@@ -12,6 +11,7 @@ from prompts import get_few_shot_prompt
 nest_asyncio.apply()  # Allow nested event loops in Jupyter
 
 num_test_examples = None
+# num_test_examples = 100
 test_data_small = load_questions("test", num_examples=num_test_examples)
 
 all_train = load_questions("train")
@@ -28,6 +28,8 @@ print(f"Train: {len(train_data)}, Val: {len(val_data_small)}, Test: {len(test_da
 def generate_few_shot_examples(
     all_examples: list[MATHQuestion], num_examples: int, w2s_prompt: bool = False
 ) -> list[dict]:
+    if num_examples is None:
+        return []
     """Generate few-shot examples from training data."""
     idxs = np.random.choice(len(all_examples), size=num_examples, replace=False)
     train_subset = [all_examples[i] for i in idxs]
@@ -35,50 +37,56 @@ def generate_few_shot_examples(
     return get_few_shot_prompt(few_shot_examples, w2s_prompt)
 
 
-num_shots = 4
-few_shot_prompts = [
-    generate_few_shot_examples(train_data, num_shots) for _ in range(num_val_examples)
-]
+def w2s_experiment(weak_model: str, strong_model: str, num_shots: int):
+    gold_fewshot_train_for_val = [
+        generate_few_shot_examples(train_data, num_shots) for _ in range(num_val_examples)
+    ]
+    print(
+        f"\nEvaluating {weak_model} on {num_val_examples} validation examples with {num_shots}-shot prompting..."
+    )
+    val_acc, val_responses = asyncio.run(
+        evaluate_model(val_data_small, weak_model, gold_fewshot_train_for_val)
+    )
+    print(f"{weak_model} val acc: {val_acc:.1%}")
 
-print(
-    f"\nEvaluating haiku-3 on {num_val_examples} validation examples with {num_shots}-shot prompting..."
-)
-val_acc, val_responses = asyncio.run(evaluate_model(val_data_small, "haiku-3", few_shot_prompts))
-print(f"Validation accuracy: {val_acc:.1%}")
+    val_dataset_w2s = copy.deepcopy(val_data_small)
+    for val_response, val_question in zip(val_responses, val_dataset_w2s):
+        val_question.solution = val_response
+    weak_fewshot_val_for_test = [
+        generate_few_shot_examples(val_dataset_w2s, num_shots, w2s_prompt=True)
+        for _ in range(len(test_data_small))
+    ]
+    w2s_results, _ = asyncio.run(
+        evaluate_model(test_data_small, strong_model, weak_fewshot_val_for_test)
+    )
+    print(f"{strong_model} with {weak_model} {num_shots}-shot: {w2s_results:.1%}")
 
-val_dataset_w2s = copy.deepcopy(val_data_small)
-for val_response, val_question in zip(val_responses, val_dataset_w2s):
-    val_question.solution = val_response
+    gold_fewshot_val_for_test = [
+        generate_few_shot_examples(val_data_small, num_shots) for _ in range(len(test_data_small))
+    ]
+    test_acc, test_responses = asyncio.run(
+        evaluate_model(test_data_small, weak_model, gold_fewshot_val_for_test)
+    )
+    print(f"{weak_model} gold {num_shots}-shot test acc: {test_acc:.1%}")
 
-few_shot_prompts_w2s = [
-    generate_few_shot_examples(val_dataset_w2s, num_shots) for _ in range(len(val_dataset_w2s))
-]
-w2s_results, _ = asyncio.run(evaluate_model(test_data_small, "sonnet-35", few_shot_prompts_w2s))
-print(f"Test accuracy with {num_shots}-shot: {w2s_results:.1%}")
+    gold_fewshot_val_for_test = [
+        generate_few_shot_examples(val_data_small, num_shots) for _ in range(len(test_data_small))
+    ]
+    w2s_results, _ = asyncio.run(
+        evaluate_model(test_data_small, strong_model, gold_fewshot_val_for_test)
+    )
+    print(f"{strong_model} with gold {num_shots}-shot: {w2s_results:.1%}")
 
-# %%
-# models = ["haiku-3", "sonnet-3", "sonnet-35", "opus-3"]
-models = ["haiku-3", "sonnet-35"]
-shots = [1, 4]
 
-table = PrettyTable()
-table.field_names = ["Model", "0-shot"] + [f"{i}-shot" for i in shots]
-for model in models:
-    row = [model]
-    print(f"Evaluating {model}...")
-    zero_shot_results = asyncio.run(evaluate_model(test_data_small, model))
-    row.append(f"{zero_shot_results[0]:.1%}")
-    print(f"Zero-shot results: {zero_shot_results[0]:.1%}")
-    for shot in shots:
-        few_shot_prompts = [
-            generate_few_shot_examples(val_data_small, shot) for _ in range(len(test_data_small))
-        ]
-        few_shot_results = asyncio.run(evaluate_model(test_data_small, model, few_shot_prompts))
-        row.append(f"{few_shot_results[0]:.1%}")
-        print(f"{shot}-shot results: {few_shot_results[0]:.1%}")
-    table.add_row(row)
+def zero_shot_experiment(model: str):
+    zero_shot_results, _ = asyncio.run(evaluate_model(test_data_small, model))
+    print(f"{model} zero-shot: {zero_shot_results:.1%}")
 
-print(f"\nInitial Prompting Results ({num_test_examples} examples):")
-print(table)
 
-# %%
+weak_model = "haiku-3"
+# strong_model = "sonnet-3"
+strong_model = "sonnet-35"
+w2s_experiment(weak_model=weak_model, strong_model=strong_model, num_shots=1)
+zero_shot_experiment(model=weak_model)
+zero_shot_experiment(model=strong_model)
+# zero_shot_experiment(model="sonnet-3")
