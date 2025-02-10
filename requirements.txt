@@ -1,0 +1,7 @@
+anthropic==0.45.2
+datasets==3.2.0
+pylatexenc==2.10
+sympy==1.13.3
+ipykernel==6.29.5
+ipdb==0.13.13
+python-dotenv==1.0.1
