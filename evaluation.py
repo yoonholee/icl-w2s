@@ -72,10 +72,11 @@ async def evaluate_model(
     responses = await get_messages_with_few_shot_prompt(
         few_shot_prompts=few_shot_prompts, prompts=prompts, model=model
     )
-    model_answers = [MATHQuestion.parse_response_for_answer(r.content[0].text) for r in responses]
+    responses_text = [r.content[0].text for r in responses]
+    model_answers = [MATHQuestion.parse_response_for_answer(r) for r in responses_text]
     results = eval_model_answers(dataset, model_answers)
     accuracy = np.mean(results)
-    return accuracy, results
+    return accuracy, responses_text
 
 
 if __name__ == "__main__":
