@@ -5,3 +5,5 @@ sympy==1.13.3
 ipykernel==6.29.5
 ipdb==0.13.13
 python-dotenv==1.0.1
+prettytable==3.14.0
+diskcache==5.6.3

@@ -2,7 +2,7 @@
 
 ### Overcomplete list of things to try
 
-- [ ] take subset of dataset, evaluate all models. narrow down to cleanest pair of models.
+- [x] take subset of dataset, evaluate all models. narrow down to cleanest pair of models.
   - Depends on how long it takes to do a full test set eval
 - [ ] measure PGR on cleanest model pair
 - [ ] vary number of shots

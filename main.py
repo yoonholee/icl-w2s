@@ -2,37 +2,50 @@
 import asyncio
 
 import nest_asyncio
+from prettytable import PrettyTable
+
+from evaluation import evaluate_model, load_questions, MATHQuestion
+from prompts import get_few_shot_prompt
 import numpy as np
 
-from evaluation import eval_model_answers, evaluate_model, load_questions
-from prompts import get_few_shot_prompt
+nest_asyncio.apply()  # Allow nested event loops in Jupyter
 
-nest_asyncio.apply()  # Allows nested event loops in Jupyter
+all_train = load_questions("train")
 
-few_shot_prompt = get_few_shot_prompt(
-    [("What is 2 + 2?", "2 + 2 = 4."), ("What is 49*7?", "49 * 7 = 343.")]
-)
-print("Few Shot Prompt Messages:")
-for message in few_shot_prompt:
-    role = message["role"].capitalize()
-    text = message["content"][0]["text"]
-    print(f"{role}: {text}")
 
-# %%
-train_dataset = load_questions("train")
-test_dataset = load_questions("test")
-oracle_acc = np.mean(eval_model_answers(train_dataset, [q.answer for q in train_dataset])) * 100
-print(f"Oracle accuracy: {oracle_acc:.2f} (should be 100%)")
+def generate_few_shot_examples(all_examples: list[MATHQuestion], num_examples: int) -> list[dict]:
+    """Generate few-shot examples from training data."""
+    idxs = np.random.choice(len(all_examples), size=num_examples, replace=False)
+    train_subset = [all_examples[i] for i in idxs]
+    few_shot_examples = [(q.problem, q.solution) for q in train_subset]
+    return get_few_shot_prompt(few_shot_examples)
+
 
 # %%
-train_dataset = load_questions("train")
-test_dataset = load_questions("test")
+num_test_examples = 50
+test_data_small = load_questions("test", num_examples=num_test_examples)
+# models = ["haiku-3", "sonnet-3", "sonnet-35", "opus-3"]
+models = ["haiku-3", "sonnet-35"]
+shots = [1, 4, 16]
 
-num_test_examples = 5
-test_data_small = test_dataset[:: len(test_dataset) // num_test_examples]
-models = ["haiku-3", "sonnet-3", "sonnet-35", "opus-3"]
-
+table = PrettyTable()
+table.field_names = ["Model", "0-shot"] + [f"{i}-shot" for i in shots]
 for model in models:
+    row = [model]
     print(f"Evaluating {model}...")
-    results = asyncio.run(evaluate_model(test_data_small, model))
-    print(f"{model} accuracy: {results[0]:.1%}")
+    zero_shot_results = asyncio.run(evaluate_model(test_data_small, model))
+    row.append(f"{zero_shot_results[0]:.1%}")
+    print(f"Zero-shot results: {zero_shot_results[0]:.1%}")
+    for shot in shots:
+        few_shot_prompts = [
+            generate_few_shot_examples(all_train, shot) for _ in range(len(test_data_small))
+        ]
+        few_shot_results = asyncio.run(evaluate_model(test_data_small, model, few_shot_prompts))
+        row.append(f"{few_shot_results[0]:.1%}")
+        print(f"{shot}-shot results: {few_shot_results[0]:.1%}")
+    table.add_row(row)
+
+print(f"\nInitial Prompting Results ({num_test_examples} examples):")
+print(table)
+
+# %%
